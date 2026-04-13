@@ -41,7 +41,12 @@ function normalizeSubject(sub) {
   return sub.charAt(0).toUpperCase() + sub.slice(1).toLowerCase();
 }
 
-const RESERVED_KEYS = new Set(['ROLL_KEY', 'ROLL', 'centerCode', 'stream']);
+const RESERVED_KEYS = new Set([
+  'ROLL_KEY', 'ROLL', 'ROLL NO.', 'rollNo', 'ROLL_NO',
+  'centerCode', 'centreCode', 'stream',
+  'NAME', 'STUDENT NAME', "STUDENT'S NAME", 'name',
+  '_id', '__v', 'createdAt', 'updatedAt'
+]);
 
 /**
  * Parse a flat test-column key into { testName, subject, isTotal }.
@@ -133,6 +138,10 @@ export function extractColumnsFromNestedTests(tests) {
   const cols = new Set();
   for (const [testName, testData] of Object.entries(tests || {})) {
     if (!testData || typeof testData !== 'object') continue;
+    
+    // Completely ignore garbage ghost columns that might be lingering in the database
+    if (testName === 'NAME' || testName === 'centreCode' || testName.length <= 1) continue;
+
     cols.add(testName); // total column
     for (const subject of Object.keys(testData)) {
       if (subject !== 'total' && subject !== 'Total') cols.add(`${testName}_${subject}`);

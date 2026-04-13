@@ -2,16 +2,16 @@ import './bootstrap-env.js';
 import express from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
-import { isFirebaseReady } from './services/firebaseInit.js';
+import { isMongoReady, initMongo } from './services/mongoInit.js';
 import {
-  isFirestoreEnabled,
+  isDbEnabled,
   upsertProfileDoc,
   deleteStudentDocs,
   upsertTestDoc,
   loadApplicationData,
   sliceCenterFromGlobal,
   getReadCacheStatus,
-} from './services/firestoreService.js';
+} from './services/dbService.js';
 import {
   computeOverview,
   rankStudentsByTest,
@@ -26,8 +26,8 @@ import {
 } from './services/analyticsService.js';
 import { CENTERS_CONFIG, ADMIN_CREDENTIALS } from './config/centers.js';
 
-const app       = express();
-const PORT      = process.env.PORT || 5000;
+const app = express();
+const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'csrl_super_secret_key_2026';
 
 app.use(cors({ origin: '*' }));
@@ -37,8 +37,8 @@ app.get('/api/health', async (_req, res) => {
   const global = await loadApplicationData();
   res.json({
     ok: true,
-    firebaseReady: isFirebaseReady(),
-    firestoreEnabled: isFirestoreEnabled(),
+    mongoReady: isMongoReady(),
+    dbEnabled: isDbEnabled(),
     readCache: getReadCacheStatus(),
     counts: {
       profiles: global.profiles.length,
@@ -190,8 +190,8 @@ app.get('/api/analytics/rankings', authenticateToken, async (req, res) => {
 
   const global = await loadApplicationData();
   const source = centerCode ? sliceCenterFromGlobal(global, centerCode) : global;
-  let ranked    = rankStudentsByTest(source.profiles, source.tests, testKey);
-  const absent  = absentCount(source.profiles, source.tests, testKey);
+  let ranked = rankStudentsByTest(source.profiles, source.tests, testKey);
+  const absent = absentCount(source.profiles, source.tests, testKey);
 
   if (order === 'asc') ranked = [...ranked].reverse();
 
@@ -257,9 +257,9 @@ app.get('/api/analytics/student-chart', authenticateToken, async (req, res) => {
 
   const global = await loadApplicationData();
   const source = centerCode ? sliceCenterFromGlobal(global, centerCode) : global;
-  const testDoc    = source.tests.find((t) => t.ROLL_KEY === rollKey) || {};
-  const chartData  = buildStudentChartData(testDoc, source.testColumns);
-  const weakSubj   = computeStudentWeakSubject(testDoc, source.testColumns);
+  const testDoc = source.tests.find((t) => t.ROLL_KEY === rollKey) || {};
+  const chartData = buildStudentChartData(testDoc, source.testColumns);
+  const weakSubj = computeStudentWeakSubject(testDoc, source.testColumns);
 
   res.json({ chartData, weakSubject: weakSubj });
 });
@@ -289,7 +289,7 @@ app.get('/api/analytics/test-columns', authenticateToken, async (req, res) => {
 
 app.post('/api/students', authenticateToken, requireAdmin, async (req, res) => {
   const student = req.body;
-  if (!student.ROLL_KEY)   return res.status(400).json({ message: 'ROLL_KEY is required' });
+  if (!student.ROLL_KEY) return res.status(400).json({ message: 'ROLL_KEY is required' });
   if (!student.centerCode) return res.status(400).json({ message: 'centerCode is required' });
 
   // Default stream to JEE
@@ -304,7 +304,7 @@ app.post('/api/students', authenticateToken, requireAdmin, async (req, res) => {
   }
 
   try {
-    if (isFirestoreEnabled()) {
+    if (isDbEnabled()) {
       await upsertProfileDoc(student);
     } else {
       globalData.profiles.push(student);
@@ -322,8 +322,8 @@ app.post('/api/students', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 app.put('/api/students/:rollKey', authenticateToken, requireAdmin, async (req, res) => {
-  const { rollKey }  = req.params;
-  const centerCode   = req.query.centerCode;
+  const { rollKey } = req.params;
+  const centerCode = req.query.centerCode;
   const globalData = await loadApplicationData();
   const idx = findProfileIndex(globalData, rollKey, centerCode);
 
@@ -333,7 +333,7 @@ app.put('/api/students/:rollKey', authenticateToken, requireAdmin, async (req, r
   const merged = { ...globalData.profiles[idx], ...req.body, ROLL_KEY: rollKey };
 
   try {
-    if (isFirestoreEnabled()) {
+    if (isDbEnabled()) {
       await upsertProfileDoc(merged);
     } else {
       globalData.profiles[idx] = merged;
@@ -352,7 +352,7 @@ app.put('/api/students/:rollKey', authenticateToken, requireAdmin, async (req, r
 
 app.delete('/api/students/:rollKey', authenticateToken, requireAdmin, async (req, res) => {
   const { rollKey } = req.params;
-  const centerCode  = req.query.centerCode;
+  const centerCode = req.query.centerCode;
   const globalData = await loadApplicationData();
   const idx = findProfileIndex(globalData, rollKey, centerCode);
 
@@ -362,7 +362,7 @@ app.delete('/api/students/:rollKey', authenticateToken, requireAdmin, async (req
   const cc = globalData.profiles[idx].centerCode;
 
   try {
-    if (isFirestoreEnabled()) {
+    if (isDbEnabled()) {
       await deleteStudentDocs(cc, rollKey);
     } else {
       globalData.profiles.splice(idx, 1);
@@ -388,9 +388,9 @@ app.delete('/api/students/:rollKey', authenticateToken, requireAdmin, async (req
  *   { scores: { tests: { "CAT-1(TEST)": { Physics: 45, total: 145 } } } } (nested patch)
  */
 app.post('/api/tests/:rollKey', authenticateToken, requireAdmin, async (req, res) => {
-  const { rollKey }  = req.params;
-  const centerCode   = req.query.centerCode;
-  const { scores }   = req.body;
+  const { rollKey } = req.params;
+  const centerCode = req.query.centerCode;
+  const { scores } = req.body;
 
   const globalData = await loadApplicationData();
   const profile = findProfile(globalData, rollKey, centerCode);
@@ -405,7 +405,7 @@ app.post('/api/tests/:rollKey', authenticateToken, requireAdmin, async (req, res
   const cc = profile.centerCode;
 
   try {
-    if (isFirestoreEnabled()) {
+    if (isDbEnabled()) {
       const testRecord = await upsertTestDoc(cc, rollKey, scores);
       console.log(`[CRUD] Upserted test scores for: ${rollKey}`);
       return res.json({ success: true, testRecord });
@@ -445,6 +445,16 @@ app.use((err, req, res, next) => {
 
 // ── Server Start ──────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`[Server] Core API Backend running on port ${PORT}`);
+
+  try {
+    if (process.env.MONGODB_URI) {
+      await initMongo();
+    }
+    const mongoStatus = isMongoReady();
+    console.log("Mongo Ready Status:", mongoStatus);
+  } catch (e) {
+    console.log("Mongo Check Error:", e);
+  }
 });

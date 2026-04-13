@@ -1,21 +1,18 @@
 import NodeCache from 'node-cache';
-import { getFirestore } from 'firebase-admin/firestore';
-import { initFirebaseApp } from './firebaseInit.js';
+import { isMongoReady, initMongo } from './mongoInit.js';
+import Profile from '../models/Profile.js';
+import TestScore from '../models/TestScore.js';
 import { flatToNested, nestedToFlat, extractColumnsFromNestedTests } from '../utils/testColumns.js';
-
-const COL_PROFILES = 'students';
-const COL_TESTS = 'testScores';
 
 const GLOBAL_DATA_CACHE_KEY = 'globalData';
 
 function readCacheTtlMs() {
-  const raw = process.env.FIRESTORE_READ_CACHE_TTL_MS;
+  const raw = process.env.DB_READ_CACHE_TTL_MS || process.env.FIRESTORE_READ_CACHE_TTL_MS;
   if (raw === '0' || raw === '') return 0;
   const n = parseInt(raw ?? '90000', 10);
   return Number.isFinite(n) && n >= 0 ? n : 90000;
 }
 
-/** NodeCache uses seconds; env is milliseconds. */
 function readCacheTtlSeconds() {
   const ms = readCacheTtlMs();
   return ms <= 0 ? 0 : Math.max(1, Math.floor(ms / 1000));
@@ -28,31 +25,31 @@ const globalDataCache = new NodeCache({
   useClones: true,
 });
 
-export function invalidateFirestoreReadCache() {
+export function invalidateDataCache() {
   globalDataCache.del(GLOBAL_DATA_CACHE_KEY);
 }
 
-/** For /api/health — confirms node-cache settings (TTL from FIRESTORE_READ_CACHE_TTL_MS). */
+// Keep the same export name as the old one so server.js doesn't break if anything still imports it
+export const invalidateFirestoreReadCache = invalidateDataCache;
+
 export function getReadCacheStatus() {
   const ttlMs = readCacheTtlMs();
   return {
     backend: 'node-cache',
     ttlMs,
-    ttlSeconds: ttlMs > 0 ? readCacheTtlSeconds() : 0,
+    ttlSeconds: ttlMs > 0 ? ttlSec : 0,
     enabled: ttlMs > 0,
     key: GLOBAL_DATA_CACHE_KEY,
   };
 }
 
-export function isFirestoreEnabled() {
-  return initFirebaseApp();
+export function isDbEnabled() {
+  // Try to init, and it returns true if URI exists
+  initMongo();
+  return process.env.MONGODB_URI !== undefined;
 }
 
-export function makeDocId(centerCode, rollKey) {
-  void centerCode;
-  const r = String(rollKey ?? '').trim().replace(/\//g, '_');
-  return r;
-}
+export const isFirestoreEnabled = isDbEnabled;
 
 function stripUndefined(obj) {
   const out = {};
@@ -98,14 +95,11 @@ function getMemoryDevStore() {
   return memoryDevStore;
 }
 
-/**
- * Full dataset: Firestore (with node-cache TTL) when configured, else in-memory dev store.
- */
 export async function loadApplicationData() {
-  if (!isFirestoreEnabled()) {
+  if (!isDbEnabled()) {
     return getMemoryDevStore();
   }
-  return loadGlobalDataFromFirestore();
+  return loadGlobalDataFromDb();
 }
 
 export function sliceCenterFromGlobal(globalData, centerCode) {
@@ -114,25 +108,67 @@ export function sliceCenterFromGlobal(globalData, centerCode) {
   const colSet = new Set();
   tests.forEach((t) => {
     Object.keys(t).forEach((k) => {
-      if (k !== 'ROLL_KEY' && k !== 'centerCode' && k !== 'stream') colSet.add(k);
+      if (k !== 'ROLL_KEY' && k !== 'centerCode' && k !== 'stream' && k !== '_id' && k !== '__v' && k !== 'createdAt' && k !== 'updatedAt') colSet.add(k);
     });
   });
   const testColumns = colSet.size > 0 ? Array.from(colSet) : globalData.testColumns;
   return { profiles, tests, testColumns };
 }
 
-async function fetchGlobalDataFromFirestoreOnce() {
-  const db = getFirestore();
-  const [pSnap, tSnap] = await Promise.all([
-    db.collection(COL_PROFILES).get(),
-    db.collection(COL_TESTS).get(),
+async function fetchGlobalDataFromDbOnce() {
+  await initMongo();
+  
+  const [profilesDocs, tDocs] = await Promise.all([
+    Profile.find({}).lean(),
+    TestScore.find({}).lean()
   ]);
 
-  const profiles = pSnap.docs.map((d) => d.data());
+  const pDocs = profilesDocs.map(d => {
+    const obj = { ...d };
+    delete obj._id;
+    delete obj.__v;
+    delete obj.createdAt;
+    delete obj.updatedAt;
+
+    // Find keys dynamically to handle casing differences like "Mobile No" vs "MOBILE NO"
+    const keys = Object.keys(obj);
+    
+    const mobileKey = keys.find(k => k.toLowerCase() === 'mobile no');
+    if (mobileKey) {
+      obj['Mobile No.'] = obj[mobileKey];
+      delete obj[mobileKey];
+    }
+    
+    // Also inject a standard "Mobile" key just in case the frontend relies on that
+    if (obj['Mobile No.']) obj['Mobile'] = obj['Mobile No.'];
+
+    const rollNoKey = keys.find(k => k.toLowerCase() === 'roll no');
+    if (rollNoKey) {
+      obj['ROLL NO.'] = obj[rollNoKey];
+      delete obj[rollNoKey];
+    }
+
+    const fatherMobileKey = keys.find(k => k.toLowerCase() === 'fathers mobile');
+    if (fatherMobileKey) {
+      obj["FATHER'S MOBILE"] = obj[fatherMobileKey];
+    }
+
+    const fatherMobileNoKey = keys.find(k => k.toLowerCase() === 'fathers mobile no');
+    if (fatherMobileNoKey) {
+      obj["FATHER'S MOBILE NO."] = obj[fatherMobileNoKey];
+    }
+
+    return obj;
+  });
 
   const testColumnsSet = new Set();
-  const tests = tSnap.docs.map((d) => {
-    const raw = d.data();
+  const tests = tDocs.map((d) => {
+    const raw = { ...d };
+    delete raw._id;
+    delete raw.__v;
+    delete raw.createdAt;
+    delete raw.updatedAt;
+    
     const nested = ensureNested(raw);
     const flat = nestedToFlat(nested);
     extractColumnsFromNestedTests(nested.tests).forEach((c) => testColumnsSet.add(c));
@@ -140,40 +176,14 @@ async function fetchGlobalDataFromFirestoreOnce() {
   });
 
   return {
-    profiles,
+    profiles: pDocs,
     tests,
     testColumns: Array.from(testColumnsSet),
   };
 }
 
-function buildReadError(err) {
-  const code = err.code;
-  const msg = err.message || String(err);
-  const denied = code === 7 || /PERMISSION_DENIED|permission/i.test(msg);
-  const quota =
-    code === 8 ||
-    code === 'resource-exhausted' ||
-    /RESOURCE_EXHAUSTED|quota exceeded|Quota exceeded/i.test(msg);
-
-  const text = denied
-    ? 'Firestore permission denied — check rules and service account.'
-    : quota
-      ? 'Firestore quota exceeded — increase FIRESTORE_READ_CACHE_TTL_MS or upgrade plan.'
-      : `Firestore read failed (${code ?? 'error'}): ${msg}`;
-
-  const e = new Error(text);
-  e.statusCode = 503;
-  e.cause = err;
-  return e;
-}
-
-/**
- * Loads all profiles + tests from Firestore with node-cache (TTL from FIRESTORE_READ_CACHE_TTL_MS).
- * Invalidated after writes via invalidateFirestoreReadCache().
- * Throws on failure (no live Firestore read and no valid cache entry).
- */
-export async function loadGlobalDataFromFirestore() {
-  if (!isFirestoreEnabled()) {
+export async function loadGlobalDataFromDb() {
+  if (!isDbEnabled()) {
     return { profiles: [], tests: [], testColumns: [] };
   }
 
@@ -191,7 +201,7 @@ export async function loadGlobalDataFromFirestore() {
   }
 
   try {
-    const data = await fetchGlobalDataFromFirestoreOnce();
+    const data = await fetchGlobalDataFromDbOnce();
     const out = {
       profiles: data.profiles,
       tests: data.tests,
@@ -206,42 +216,53 @@ export async function loadGlobalDataFromFirestore() {
     }
     return out;
   } catch (err) {
-    console.error('[Firestore] loadGlobalDataFromFirestore failed:', err.code || '', err.message || err);
-    throw buildReadError(err);
+    console.error('[DB] loadGlobalDataFromDb failed:', err.message || err);
+    throw new Error(`Database read failed: ${err.message}`);
   }
 }
 
 export async function upsertProfileDoc(student) {
-  if (!isFirestoreEnabled()) return;
+  if (!isDbEnabled()) return;
   const { centerCode, ROLL_KEY } = student;
   if (!centerCode || !ROLL_KEY) throw new Error('centerCode and ROLL_KEY are required');
 
-  const db = getFirestore();
-  const id = makeDocId(centerCode, ROLL_KEY);
-  await db.collection(COL_PROFILES).doc(id).set(stripUndefined(student), { merge: true });
-  invalidateFirestoreReadCache();
+  await initMongo();
+  const cleanStudent = stripUndefined(student);
+  
+  await Profile.findOneAndUpdate(
+    { centerCode, ROLL_KEY },
+    { $set: cleanStudent },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  invalidateDataCache();
 }
 
 export async function deleteStudentDocs(centerCode, rollKey) {
-  if (!isFirestoreEnabled()) return;
-  const db = getFirestore();
-  const id = makeDocId(centerCode, rollKey);
-  const bat = db.batch();
-  bat.delete(db.collection(COL_PROFILES).doc(id));
-  bat.delete(db.collection(COL_TESTS).doc(id));
-  await bat.commit();
-  invalidateFirestoreReadCache();
+  if (!isDbEnabled()) return;
+  await initMongo();
+  
+  await Promise.all([
+    Profile.deleteOne({ centerCode, ROLL_KEY: rollKey }),
+    TestScore.deleteOne({ centerCode, ROLL_KEY: rollKey })
+  ]);
+  
+  invalidateDataCache();
 }
 
 export async function upsertTestDoc(centerCode, rollKey, scores) {
-  if (!isFirestoreEnabled()) return {};
+  if (!isDbEnabled()) return {};
 
-  const db = getFirestore();
-  const id = makeDocId(centerCode, rollKey);
-  const ref = db.collection(COL_TESTS).doc(id);
+  await initMongo();
 
-  const snap = await ref.get();
-  const base = snap.exists ? ensureNested(snap.data()) : { ROLL_KEY: rollKey, centerCode, stream: 'JEE', tests: {} };
+  const doc = await TestScore.findOne({ centerCode, ROLL_KEY: rollKey });
+  let base;
+  
+  if (doc) {
+    base = ensureNested(doc.toObject());
+  } else {
+    base = { ROLL_KEY: rollKey, centerCode, stream: 'JEE', tests: {} };
+  }
 
   if (scores && typeof scores.tests === 'object') {
     for (const [testName, testData] of Object.entries(scores.tests)) {
@@ -258,7 +279,14 @@ export async function upsertTestDoc(centerCode, rollKey, scores) {
 
   if (scores.stream) base.stream = scores.stream;
 
-  await ref.set(stripUndefined(base), { merge: false });
-  invalidateFirestoreReadCache();
+  const cleanBase = stripUndefined(base);
+  
+  await TestScore.findOneAndUpdate(
+    { centerCode, ROLL_KEY: rollKey },
+    { $set: cleanBase },
+    { upsert: true, setDefaultsOnInsert: true }
+  );
+
+  invalidateDataCache();
   return nestedToFlat(base);
 }
