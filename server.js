@@ -88,7 +88,7 @@ app.post('/api/auth/login', async (req, res) => {
   if (role === 'admin') {
     if (id === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
       const token = jwt.sign({ role: 'admin', id: 'admin' }, JWT_SECRET, { expiresIn: '12h' });
-      return res.json({ success: true, token, role: 'admin', id: 'admin', name: 'Super Admin' });
+      return res.json({ success: true, token, role: 'admin', id: 'admin', name: 'CSRL Admin' });
     }
   } else if (role === 'centre') {
     const cc = CENTERS_CONFIG[id];
