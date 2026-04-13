@@ -59,6 +59,26 @@ function stripUndefined(obj) {
   return out;
 }
 
+// MongoDB does not allow dots in field names (treats them as path separators).
+// We encode dots as '___dot___' on write and restore them on read.
+function sanitizeKeysForMongo(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const safeKey = k.replace(/\./g, '___dot___');
+    out[safeKey] = v;
+  }
+  return out;
+}
+
+function restoreKeysFromMongo(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const origKey = k.replace(/___dot___/g, '.');
+    out[origKey] = v;
+  }
+  return out;
+}
+
 function isNestedFormat(doc) {
   return doc && typeof doc.tests === 'object' && doc.tests !== null;
 }
@@ -124,7 +144,8 @@ async function fetchGlobalDataFromDbOnce() {
   ]);
 
   const pDocs = profilesDocs.map(d => {
-    const obj = { ...d };
+    // Restore any dot-encoded keys (___dot___ -> .) stored to work around MongoDB restrictions
+    const obj = restoreKeysFromMongo({ ...d });
     delete obj._id;
     delete obj.__v;
     delete obj.createdAt;
@@ -227,7 +248,8 @@ export async function upsertProfileDoc(student) {
   if (!centerCode || !ROLL_KEY) throw new Error('centerCode and ROLL_KEY are required');
 
   await initMongo();
-  const cleanStudent = stripUndefined(student);
+  // Sanitize field names: MongoDB forbids dots in field names used with $set
+  const cleanStudent = sanitizeKeysForMongo(stripUndefined(student));
   
   await Profile.findOneAndUpdate(
     { centerCode, ROLL_KEY },
