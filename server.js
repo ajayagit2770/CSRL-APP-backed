@@ -2,7 +2,14 @@ import './bootstrap-env.js';
 import express from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
 import { isMongoReady, initMongo } from './services/mongoInit.js';
+import TopicMap from './models/TopicMap.js';
+import StudentRawMarks from './models/StudentRawMarks.js';
+import StudentWeakTopics from './models/StudentWeakTopics.js';
+import CenterWeakTopics from './models/CenterWeakTopics.js';
+import { parseTopicMapCsv, parseMarksCsv } from './services/csvParserService.js';
+import { checkAndTrigger } from './services/weakTopicService.js';
 import {
   isDbEnabled,
   upsertProfileDoc,
@@ -425,6 +432,149 @@ app.post('/api/tests/:rollKey', authenticateToken, requireAdmin, async (req, res
   } catch (e) {
     console.error('[CRUD] Test upsert failed:', e);
     return res.status(500).json({ message: e.message || 'Save failed' });
+  }
+});
+
+// ── Weak Topics — Admin Routes ────────────────────────────────────────────────
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+/**
+ * POST /api/admin/weak-topics/upload-topic-map
+ * Upload a topic-map CSV for a specific test and paper.
+ * Body fields: testId, paper, paperCount (string)
+ * File field: file (.csv)
+ */
+app.post('/api/admin/weak-topics/upload-topic-map', authenticateToken, requireAdmin, upload.single('file'), async (req, res) => {
+  try {
+    const { testId, paper, paperCount } = req.body;
+    if (!testId) return res.status(400).json({ success: false, message: 'testId is required' });
+    if (!paper)  return res.status(400).json({ success: false, message: 'paper is required' });
+    if (!req.file) return res.status(400).json({ success: false, message: 'CSV file is required' });
+
+    await initMongo();
+
+    const topics = parseTopicMapCsv(req.file.buffer);
+    if (!topics.length) return res.status(400).json({ success: false, message: 'No valid topics found in CSV' });
+
+    // Upsert: replace existing topic map for this testId+paper
+    await TopicMap.findOneAndUpdate(
+      { testId, paper },
+      { $set: { topics } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const count = parseInt(paperCount, 10) || 1;
+    // Run as background task — don't block response
+    checkAndTrigger(testId, count).catch((e) => console.error('[WeakTopics] checkAndTrigger error:', e));
+
+    return res.json({
+      success: true,
+      message: `Topic map for ${testId} ${paper} uploaded successfully`,
+      topicsCount: topics.length,
+    });
+  } catch (e) {
+    console.error('[WeakTopics] upload-topic-map error:', e);
+    return res.status(500).json({ success: false, message: e.message || 'Failed to upload topic map' });
+  }
+});
+
+/**
+ * POST /api/admin/weak-topics/upload-marks
+ * Upload a marks-awarded CSV for a specific test and paper.
+ * Body fields: testId, paper, paperCount (string)
+ * File field: file (.csv)
+ */
+app.post('/api/admin/weak-topics/upload-marks', authenticateToken, requireAdmin, upload.single('file'), async (req, res) => {
+  try {
+    const { testId, paper, paperCount } = req.body;
+    if (!testId)  return res.status(400).json({ success: false, message: 'testId is required' });
+    if (!paper)   return res.status(400).json({ success: false, message: 'paper is required' });
+    if (!req.file) return res.status(400).json({ success: false, message: 'CSV file is required' });
+
+    await initMongo();
+
+    const students = parseMarksCsv(req.file.buffer);
+    if (!students.length) return res.status(400).json({ success: false, message: 'No valid student rows found in CSV' });
+
+    // Delete existing marks for this testId+paper to replace with fresh upload
+    await StudentRawMarks.deleteMany({ testId, paper });
+
+    // Insert new mark documents
+    const docs = students.map((s) => ({
+      studentId:   s.studentId,
+      testId,
+      paper,
+      centerId:    s.centerId,
+      studentName: s.studentName,
+      marks:       s.marks,
+    }));
+    await StudentRawMarks.insertMany(docs, { ordered: false });
+
+    const count = parseInt(paperCount, 10) || 1;
+    // Run as background task — don't block response
+    checkAndTrigger(testId, count).catch((e) => console.error('[WeakTopics] checkAndTrigger error:', e));
+
+    return res.json({
+      success: true,
+      message: `Marks for ${testId} ${paper} uploaded successfully`,
+      studentsCount: students.length,
+    });
+  } catch (e) {
+    console.error('[WeakTopics] upload-marks error:', e);
+    return res.status(500).json({ success: false, message: e.message || 'Failed to upload marks' });
+  }
+});
+
+// ── Weak Topics — Student Routes ───────────────────────────────────────────────
+
+/**
+ * GET /api/student/weak-topics/:studentId?testId=
+ * Get weak topic analysis for a student.
+ */
+app.get('/api/student/weak-topics/:studentId', authenticateToken, async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { testId } = req.query;
+
+    await initMongo();
+
+    if (testId) {
+      const doc = await StudentWeakTopics.findOne({ studentId, testId }).lean();
+      return res.json({ success: true, data: doc || {} });
+    }
+
+    const docs = await StudentWeakTopics.find({ studentId }).sort({ testId: 1 }).lean();
+    return res.json({ success: true, data: docs });
+  } catch (e) {
+    console.error('[WeakTopics] student route error:', e);
+    return res.status(500).json({ success: false, message: e.message || 'Failed to fetch student weak topics' });
+  }
+});
+
+// ── Weak Topics — Center Routes ────────────────────────────────────────────────
+
+/**
+ * GET /api/center/weak-topics/:centerId?testId=
+ * Get weak topic analysis for a center.
+ */
+app.get('/api/center/weak-topics/:centerId', authenticateToken, async (req, res) => {
+  try {
+    const { centerId } = req.params;
+    const { testId } = req.query;
+
+    await initMongo();
+
+    if (testId) {
+      const doc = await CenterWeakTopics.findOne({ centerId, testId }).lean();
+      return res.json({ success: true, data: doc || {} });
+    }
+
+    const docs = await CenterWeakTopics.find({ centerId }).sort({ testId: 1 }).lean();
+    return res.json({ success: true, data: docs });
+  } catch (e) {
+    console.error('[WeakTopics] center route error:', e);
+    return res.status(500).json({ success: false, message: e.message || 'Failed to fetch center weak topics' });
   }
 });
 
