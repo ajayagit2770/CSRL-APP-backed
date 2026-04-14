@@ -22,7 +22,7 @@ import { parse } from 'csv-parse/sync';
  */
 export function parseTopicMapCsv(buffer) {
   const rows = parse(buffer, {
-    columns: true,
+    columns: header => header.map(col => col.trim().toLowerCase()),
     skip_empty_lines: true,
     trim: true,
   });
@@ -46,7 +46,7 @@ export function parseTopicMapCsv(buffer) {
       subject:   row.subject.trim(),
       questions: row.questions
         .split('|')
-        .map((q) => q.trim())
+        .map((q) => q.trim().toUpperCase())
         .filter(Boolean),
     }));
 }
@@ -63,7 +63,16 @@ export function parseTopicMapCsv(buffer) {
  */
 export function parseMarksCsv(buffer) {
   const rows = parse(buffer, {
-    columns: true,
+    columns: header => header.map(column => {
+      const col = column.trim();
+      const lower = col.toLowerCase();
+      if (lower === 'roll_key' || lower === 'roll') return 'roll_no';
+      if (lower === 'centrecode' || lower === 'centercode' || lower === 'centre' || lower === 'center') return 'Location';
+      if (lower === 'location') return 'Location';
+      if (lower === "student's name" || lower === 'student name') return 'Name';
+      if (/^q\d+$/i.test(col)) return col.toUpperCase(); // Normalize q1 to Q1
+      return col;
+    }),
     skip_empty_lines: true,
     trim: true,
   });
@@ -75,13 +84,13 @@ export function parseMarksCsv(buffer) {
   const firstRow = rows[0];
   if (!('roll_no' in firstRow)) {
     throw new Error(
-      'Marks CSV must have a "roll_no" column. ' +
+      'Marks CSV must have a "roll_no" or "ROLL_KEY" column. ' +
       `Found: ${Object.keys(firstRow).join(', ')}`
     );
   }
   if (!('Location' in firstRow)) {
     throw new Error(
-      'Marks CSV must have a "Location" column. ' +
+      'Marks CSV must have a "Location" or "centreCode" column. ' +
       `Found: ${Object.keys(firstRow).join(', ')}`
     );
   }
