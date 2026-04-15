@@ -140,7 +140,7 @@ export function extractColumnsFromNestedTests(tests) {
     if (!testData || typeof testData !== 'object') continue;
     
     // Completely ignore garbage ghost columns that might be lingering in the database
-    if (testName === 'NAME' || testName === 'centreCode' || testName.length <= 1) continue;
+    if (testName === 'NAME' || testName === 'centreCode' || testName.length <= 1 || testName === 'CAT4') continue;
 
     cols.add(testName); // total column
     for (const subject of Object.keys(testData)) {

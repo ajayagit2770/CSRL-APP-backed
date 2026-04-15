@@ -128,7 +128,12 @@ export function sliceCenterFromGlobal(globalData, centerCode) {
   const colSet = new Set();
   tests.forEach((t) => {
     Object.keys(t).forEach((k) => {
-      if (k !== 'ROLL_KEY' && k !== 'centerCode' && k !== 'stream' && k !== '_id' && k !== '__v' && k !== 'createdAt' && k !== 'updatedAt') colSet.add(k);
+      // Ignore meta keys
+      if (k === 'ROLL_KEY' || k === 'centerCode' || k === 'stream' || k === '_id' || k === '__v' || k === 'createdAt' || k === 'updatedAt') return;
+      // Ignore ghost test names and redundant data
+      if (k.length <= 1 || k === 'NAME' || k === 'centreCode' || k === 'CAT4' || k.startsWith('CAT4_')) return;
+      
+      colSet.add(k);
     });
   });
   const testColumns = colSet.size > 0 ? Array.from(colSet) : globalData.testColumns;

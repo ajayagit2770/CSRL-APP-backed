@@ -21,6 +21,7 @@ export async function computeStudentOverallWeakTopics(studentId) {
   // 3. Loop through each test
   for (const testResult of allTestResults) {
     const testId = testResult.testId;
+    if (!testId || testId.length <= 1 || testId === 'CAT4') continue;
 
     // CRITICAL FIX — get topics from TopicMap for this test
     const topicMaps = await TopicMap.find({ testId });
@@ -88,14 +89,15 @@ export async function computeStudentOverallWeakTopics(studentId) {
   }
 
   // 7. Upsert into StudentOverallWeakTopics
+  const finalTestsIncluded = testsIncluded.filter(t => t && t.length > 1 && t !== 'CAT4');
   await StudentOverallWeakTopics.updateOne(
     { studentId },
     {
       $set: {
         studentId,
         centerId,
-        testsIncluded,
-        totalTests: testsIncluded.length,
+        testsIncluded: finalTestsIncluded,
+        totalTests: finalTestsIncluded.length,
         overallWeakTopics: grouped,
         computedAt: new Date()
       }
@@ -119,6 +121,7 @@ export async function computeCenterOverallWeakTopics(centerId) {
   // 3. Loop through each test
   for (const testResult of allTestResults) {
     const testId = testResult.testId;
+    if (!testId || testId.length <= 1 || testId === 'CAT4') continue;
 
     // CRITICAL FIX — get topics from TopicMap for this test
     const topicMaps = await TopicMap.find({ testId });
@@ -205,13 +208,14 @@ export async function computeCenterOverallWeakTopics(centerId) {
   }
 
   // 7. Upsert into CenterOverallWeakTopics
+  const finalTestsIncluded = testsIncluded.filter(t => t && t.length > 1 && t !== 'CAT4');
   await CenterOverallWeakTopics.updateOne(
     { centerId },
     {
       $set: {
         centerId,
-        testsIncluded,
-        totalTests: testsIncluded.length,
+        testsIncluded: finalTestsIncluded,
+        totalTests: finalTestsIncluded.length,
         overallWeakTopics: grouped,
         computedAt: new Date()
       }

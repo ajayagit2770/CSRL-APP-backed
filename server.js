@@ -547,7 +547,8 @@ app.get('/api/student/weak-topics/:studentId', authenticateToken, async (req, re
     }
 
     const docs = await StudentWeakTopics.find({ studentId }).sort({ testId: 1 }).lean();
-    return res.json({ success: true, data: docs });
+    const filtered = docs.filter(d => d.testId && d.testId.length > 1 && d.testId !== 'CAT4');
+    return res.json({ success: true, data: filtered });
   } catch (e) {
     console.error('[WeakTopics] student route error:', e);
     return res.status(500).json({ success: false, message: e.message || 'Failed to fetch student weak topics' });
@@ -573,7 +574,8 @@ app.get('/api/center/weak-topics/:centerId', authenticateToken, async (req, res)
     }
 
     const docs = await CenterWeakTopics.find({ centerId }).sort({ testId: 1 }).lean();
-    return res.json({ success: true, data: docs });
+    const filtered = docs.filter(d => d.testId && d.testId.length > 1 && d.testId !== 'CAT4');
+    return res.json({ success: true, data: filtered });
   } catch (e) {
     console.error('[WeakTopics] center route error:', e);
     return res.status(500).json({ success: false, message: e.message || 'Failed to fetch center weak topics' });
