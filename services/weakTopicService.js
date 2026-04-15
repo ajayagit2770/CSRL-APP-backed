@@ -9,6 +9,7 @@ import StudentRawMarks from '../models/StudentRawMarks.js';
 import StudentWeakTopics from '../models/StudentWeakTopics.js';
 import CenterWeakTopics from '../models/CenterWeakTopics.js';
 import { classifyTopics } from '../utils/topicUtils.js';
+import { computeStudentOverallWeakTopics, computeCenterOverallWeakTopics } from './overallWeakTopicService.js';
 
 /**
  * checkAndTrigger — check if all required data is present,
@@ -174,6 +175,21 @@ export async function computeWeakTopics(testId, paperCount) {
   // ── Step 6: Compute center weak topics ────────────────────────────────────
 
   await computeCenterWeakTopics(testId, allStudentResults, topicSubjectMap);
+
+  // ── Step 7: Recompute overall weak topics ─────────────────────────────────
+
+  // Recompute overall weak topics for all affected students
+  for (const studentId of allStudentIds) {
+    await computeStudentOverallWeakTopics(studentId);
+  }
+
+  // Recompute overall weak topics for all affected centers
+  const affectedCenters = [...new Set(
+    allStudentResults.map(r => r.centerId).filter(Boolean)
+  )];
+  for (const centerId of affectedCenters) {
+    await computeCenterOverallWeakTopics(centerId);
+  }
 }
 
 /**

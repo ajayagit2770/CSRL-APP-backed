@@ -8,6 +8,8 @@ import TopicMap from './models/TopicMap.js';
 import StudentRawMarks from './models/StudentRawMarks.js';
 import StudentWeakTopics from './models/StudentWeakTopics.js';
 import CenterWeakTopics from './models/CenterWeakTopics.js';
+import StudentOverallWeakTopics from './models/StudentOverallWeakTopics.js';
+import CenterOverallWeakTopics from './models/CenterOverallWeakTopics.js';
 import { parseTopicMapCsv, parseMarksCsv } from './services/csvParserService.js';
 import { checkAndTrigger } from './services/weakTopicService.js';
 import {
@@ -575,6 +577,38 @@ app.get('/api/center/weak-topics/:centerId', authenticateToken, async (req, res)
   } catch (e) {
     console.error('[WeakTopics] center route error:', e);
     return res.status(500).json({ success: false, message: e.message || 'Failed to fetch center weak topics' });
+  }
+});
+
+/**
+ * GET /api/student/overall-weak-topics/:studentId
+ * Get overall weak topic analysis for a student across all tests.
+ */
+app.get('/api/student/overall-weak-topics/:studentId', authenticateToken, async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    await initMongo();
+    const doc = await StudentOverallWeakTopics.findOne({ studentId }).lean();
+    return res.json({ success: true, data: doc || {} });
+  } catch (e) {
+    console.error('[WeakTopics] student overall route error:', e);
+    return res.status(500).json({ success: false, message: e.message || 'Failed to fetch student overall weak topics' });
+  }
+});
+
+/**
+ * GET /api/center/overall-weak-topics/:centerId
+ * Get overall weak topic analysis for a center across all tests.
+ */
+app.get('/api/center/overall-weak-topics/:centerId', authenticateToken, async (req, res) => {
+  try {
+    const { centerId } = req.params;
+    await initMongo();
+    const doc = await CenterOverallWeakTopics.findOne({ centerId }).lean();
+    return res.json({ success: true, data: doc || {} });
+  } catch (e) {
+    console.error('[WeakTopics] center overall route error:', e);
+    return res.status(500).json({ success: false, message: e.message || 'Failed to fetch center overall weak topics' });
   }
 });
 
