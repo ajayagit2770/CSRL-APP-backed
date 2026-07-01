@@ -13,8 +13,10 @@ export const syllabusData = [
       "Circular Motion",
       "WPE (Work, Power, Energy) / Work-Energy Theorem",
       "WPE", 
+      "Work-Energy Theorem",
       "Rotational Motion / Rotational Dynamics",
       "Rotational Motion", 
+      "Rotational Dynamics",
       "Gravitation",
       "Elasticity",
       "Fluid Mechanics",
@@ -22,6 +24,7 @@ export const syllabusData = [
       "Thermodynamics",
       "Kinetic Theory",
       "SHM / Oscillations",
+      "SHM",
       "Waves"
     ]
   },
