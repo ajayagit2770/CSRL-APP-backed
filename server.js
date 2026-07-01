@@ -10,8 +10,9 @@ import StudentWeakTopics from './models/StudentWeakTopics.js';
 import CenterWeakTopics from './models/CenterWeakTopics.js';
 import StudentOverallWeakTopics from './models/StudentOverallWeakTopics.js';
 import CenterOverallWeakTopics from './models/CenterOverallWeakTopics.js';
-import { parseTopicMapCsv, parseMarksCsv } from './services/csvParserService.js';
-import { checkAndTrigger } from './services/weakTopicService.js';
+import SyllabusTopics from './models/SyllabusTopics.js';
+import { parseTestSheet, buildTopicSubjectLookup } from './services/csvParserService.js';
+import { computeWeakTopics } from './services/weakTopicService.js';
 import {
   isDbEnabled,
   upsertProfileDoc,
@@ -442,89 +443,120 @@ app.post('/api/tests/:rollKey', authenticateToken, requireAdmin, async (req, res
 const upload = multer({ storage: multer.memoryStorage() });
 
 /**
- * POST /api/admin/weak-topics/upload-topic-map
- * Upload a topic-map CSV for a specific test and paper.
- * Body fields: testId, paper, paperCount (string)
- * File field: file (.csv)
+ * POST /api/admin/weak-topics/upload-test-sheet
+ * Upload a unified test sheet (CSV) containing headers, topic row, answer-key row,
+ * and all student marks in a single file — no paper1/paper2 split.
+ *
+ * Sheet format:
+ *   Row 1: LOCATION | ROLL NO. | NAME | Q1 | Q2 | … | Qn  (headers)
+ *   Row 2: (blank)  | (blank)  | (blank) | Kinematics | Laws of Motion | …  (topic per question)
+ *   Row 3: (blank)  | (blank)  | (blank) | A | B | …  (answer key — stored only)
+ *   Row 4+: student data rows
+ *
+ * Body fields: testId (string)
+ * File field:  file (.csv)
+ *
+ * Returns a diagnostic summary:
+ *   { success, testId, studentsProcessed, studentsAbsent, topicsFound,
+ *     smallQuestionTopics, centersProcessed, warnings }
  */
-app.post('/api/admin/weak-topics/upload-topic-map', authenticateToken, requireAdmin, upload.single('file'), async (req, res) => {
+app.post('/api/admin/weak-topics/upload-test-sheet', authenticateToken, requireAdmin, upload.single('file'), async (req, res) => {
   try {
-    const { testId, paper, paperCount } = req.body;
-    if (!testId) return res.status(400).json({ success: false, message: 'testId is required' });
-    if (!paper)  return res.status(400).json({ success: false, message: 'paper is required' });
+    const { testId } = req.body;
+    if (!testId)   return res.status(400).json({ success: false, message: 'testId is required' });
     if (!req.file) return res.status(400).json({ success: false, message: 'CSV file is required' });
 
     await initMongo();
 
-    const topics = parseTopicMapCsv(req.file.buffer);
-    if (!topics.length) return res.status(400).json({ success: false, message: 'No valid topics found in CSV' });
+    // Seed topic→subject lookup from DB syllabus (best-effort; sheet prefix format also works)
+    try {
+      const syllabusEntries = await SyllabusTopics.find({}).lean();
+      if (syllabusEntries.length > 0) buildTopicSubjectLookup(syllabusEntries);
+    } catch (e) {
+      console.warn('[WeakTopics] Could not load SyllabusTopics for subject inference:', e.message);
+    }
 
-    // Upsert: replace existing topic map for this testId+paper
+    // Parse the sheet — throws with .validationErrors if sheet is malformed
+    let parsed;
+    try {
+      parsed = parseTestSheet(req.file.buffer);
+    } catch (parseErr) {
+      const errors = parseErr.validationErrors || [parseErr.message];
+      return res.status(422).json({
+        success:          false,
+        message:          'Test sheet validation failed. Fix the errors below and re-upload.',
+        validationErrors: errors,
+      });
+    }
+
+    const {
+      topicsWithQuestions,
+      smallQuestionTopics,
+      unknownSubjectQuestions,
+      students,
+      questionTopicMap,
+    } = parsed;
+
+    // Idempotent: delete existing raw marks for this testId, then re-insert
+    await StudentRawMarks.deleteMany({ testId });
+
+    // Upsert TopicMap (single doc per testId)
+    const topicEntries = Object.entries(topicsWithQuestions).map(([topic, { questions, subject }]) => ({
+      topic,
+      subject,
+      questions,
+      questionCount: questions.length,
+    }));
     await TopicMap.findOneAndUpdate(
-      { testId, paper },
-      { $set: { topics } },
+      { testId },
+      { $set: { topics: topicEntries } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    const count = parseInt(paperCount, 10) || 1;
-    // Run as background task — don't block response
-    checkAndTrigger(testId, count).catch((e) => console.error('[WeakTopics] checkAndTrigger error:', e));
+    // Insert student raw marks
+    if (students.length > 0) {
+      const marksDocs = students.map((s) => ({
+        studentId:   s.studentId,
+        testId,
+        centerId:    s.centerId,
+        studentName: s.name,
+        marks:       s.marks,
+      }));
+      await StudentRawMarks.insertMany(marksDocs, { ordered: false });
+    }
+
+    // Compute weak topics immediately (no paper-count gate needed anymore)
+    let computeResult = { studentsProcessed: 0, studentsAbsent: 0, topicsFound: 0, smallQuestionTopics: [], centersProcessed: 0 };
+    try {
+      computeResult = await computeWeakTopics(testId);
+    } catch (e) {
+      console.error('[WeakTopics] computeWeakTopics error after upload:', e);
+      // Don't fail the request — data is saved; computation can be retried
+    }
+
+    const warnings = [];
+    if (smallQuestionTopics.length > 0) {
+      warnings.push(
+        `Topics with fewer than 3 questions (quantization warning — "Weak" band may not trigger): ` +
+        smallQuestionTopics.join(', ')
+      );
+    }
 
     return res.json({
-      success: true,
-      message: `Topic map for ${testId} ${paper} uploaded successfully`,
-      topicsCount: topics.length,
-    });
-  } catch (e) {
-    console.error('[WeakTopics] upload-topic-map error:', e);
-    return res.status(500).json({ success: false, message: e.message || 'Failed to upload topic map' });
-  }
-});
-
-/**
- * POST /api/admin/weak-topics/upload-marks
- * Upload a marks-awarded CSV for a specific test and paper.
- * Body fields: testId, paper, paperCount (string)
- * File field: file (.csv)
- */
-app.post('/api/admin/weak-topics/upload-marks', authenticateToken, requireAdmin, upload.single('file'), async (req, res) => {
-  try {
-    const { testId, paper, paperCount } = req.body;
-    if (!testId)  return res.status(400).json({ success: false, message: 'testId is required' });
-    if (!paper)   return res.status(400).json({ success: false, message: 'paper is required' });
-    if (!req.file) return res.status(400).json({ success: false, message: 'CSV file is required' });
-
-    await initMongo();
-
-    const students = parseMarksCsv(req.file.buffer);
-    if (!students.length) return res.status(400).json({ success: false, message: 'No valid student rows found in CSV' });
-
-    // Delete existing marks for this testId+paper to replace with fresh upload
-    await StudentRawMarks.deleteMany({ testId, paper });
-
-    // Insert new mark documents
-    const docs = students.map((s) => ({
-      studentId:   s.studentId,
+      success:             true,
       testId,
-      paper,
-      centerId:    s.centerId,
-      studentName: s.studentName,
-      marks:       s.marks,
-    }));
-    await StudentRawMarks.insertMany(docs, { ordered: false });
-
-    const count = parseInt(paperCount, 10) || 1;
-    // Run as background task — don't block response
-    checkAndTrigger(testId, count).catch((e) => console.error('[WeakTopics] checkAndTrigger error:', e));
-
-    return res.json({
-      success: true,
-      message: `Marks for ${testId} ${paper} uploaded successfully`,
-      studentsCount: students.length,
+      studentsIngested:    students.length,
+      studentsProcessed:   computeResult.studentsProcessed,
+      studentsAbsent:      computeResult.studentsAbsent,
+      topicsFound:         computeResult.topicsFound,
+      smallQuestionTopics: computeResult.smallQuestionTopics,
+      centersProcessed:    computeResult.centersProcessed,
+      message:             `Test sheet for ${testId} processed successfully.`,
+      warnings,
     });
   } catch (e) {
-    console.error('[WeakTopics] upload-marks error:', e);
-    return res.status(500).json({ success: false, message: e.message || 'Failed to upload marks' });
+    console.error('[WeakTopics] upload-test-sheet error:', e);
+    return res.status(500).json({ success: false, message: e.message || 'Failed to process test sheet' });
   }
 });
 

@@ -1,19 +1,32 @@
 import mongoose from 'mongoose';
 
+// Topic-level weak classification (arrays of topic name strings)
 const SubjectWeakSchema = new mongoose.Schema({
-  strongWeak: { type: [String], default: [] },
-  mediumWeak: { type: [String], default: [] },
+  strongWeak: { type: [String], default: [] }, // "Weakest Topic" — notPositive/total >= 2/3
+  mediumWeak: { type: [String], default: [] }, // "Weak Topic"    — notPositive/total >= 1/2 & < 2/3
 }, { _id: false });
 
 const StudentWeakTopicsSchema = new mongoose.Schema({
   studentId:  { type: String, required: true },
   testId:     { type: String, required: true },
   centerId:   { type: String, required: true },
+
+  // Per-topic classification grouped by subject
   weakTopics: {
     Physics:     { type: SubjectWeakSchema, default: () => ({ strongWeak: [], mediumWeak: [] }) },
     Chemistry:   { type: SubjectWeakSchema, default: () => ({ strongWeak: [], mediumWeak: [] }) },
     Mathematics: { type: SubjectWeakSchema, default: () => ({ strongWeak: [], mediumWeak: [] }) },
   },
+
+  // Per-subject classification (question-accuracy based — separate from avg-marks method)
+  // strongWeak: subject name string if notPositive/total >= 2/3 across all questions in subject
+  // mediumWeak: subject name string if notPositive/total >= 1/2 across all questions in subject
+  weakSubjects: {
+    Physics:     { type: SubjectWeakSchema, default: () => ({ strongWeak: [], mediumWeak: [] }) },
+    Chemistry:   { type: SubjectWeakSchema, default: () => ({ strongWeak: [], mediumWeak: [] }) },
+    Mathematics: { type: SubjectWeakSchema, default: () => ({ strongWeak: [], mediumWeak: [] }) },
+  },
+
   computedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
