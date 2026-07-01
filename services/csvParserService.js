@@ -172,8 +172,21 @@ export function parseTestSheet(buffer) {
     throw err;
   }
 
-  // ── 3. Parse Row 2 (index 1): topics ──────────────────────────────────────
-  const topicRow = allRows[1] || [];
+  // ── 2b. Dynamically find Topic and Answer Key rows ────────────────────────
+  let topicRowIdx = 1;
+  let answerKeyRowIdx = 2;
+  
+  for (let r = 1; r < Math.min(allRows.length, 10); r++) {
+    const rowPrefixes = allRows[r].slice(0, 3).map(c => String(c).trim().toUpperCase());
+    if (rowPrefixes.includes('TOPIC') || rowPrefixes.includes('TOPICS')) {
+      topicRowIdx = r;
+    } else if (rowPrefixes.includes('ANSWER KEY') || rowPrefixes.includes('ANSWER_KEY') || rowPrefixes.includes('ANSWERS')) {
+      answerKeyRowIdx = r;
+    }
+  }
+
+  // ── 3. Parse Topics ───────────────────────────────────────────────────────
+  const topicRow = allRows[topicRowIdx] || [];
 
   const questionTopicMap  = {};
   const questionSubjectMap = {};
@@ -211,8 +224,8 @@ export function parseTestSheet(buffer) {
     throw err;
   }
 
-  // ── 4. Parse Row 3 (index 2): answer key (stored, not used in calc) ────────
-  const answerRow = allRows[2] || [];
+  // ── 4. Parse Answer key (stored, not used in calc) ────────
+  const answerRow = allRows[answerKeyRowIdx] || [];
   const questionAnswerMap = {};
   for (let i = 0; i < qColIndices.length; i++) {
     questionAnswerMap[questionCols[i]] = (answerRow[qColIndices[i]] || '').trim();
@@ -242,10 +255,11 @@ export function parseTestSheet(buffer) {
     );
   }
 
-  // ── 6. Parse student rows (index 3+) ─────────────────────────────────────
+  // ── 6. Parse student rows (starts after answer key) ──────────────────────
   const students = [];
+  const startRowIdx = Math.max(answerKeyRowIdx + 1, topicRowIdx + 1, 3); // ensure we don't parse headers
 
-  for (let rowIdx = 3; rowIdx < allRows.length; rowIdx++) {
+  for (let rowIdx = startRowIdx; rowIdx < allRows.length; rowIdx++) {
     const row = allRows[rowIdx];
 
     // Skip fully blank rows

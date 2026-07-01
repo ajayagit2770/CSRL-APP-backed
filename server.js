@@ -11,6 +11,7 @@ import CenterWeakTopics from './models/CenterWeakTopics.js';
 import StudentOverallWeakTopics from './models/StudentOverallWeakTopics.js';
 import CenterOverallWeakTopics from './models/CenterOverallWeakTopics.js';
 import SyllabusTopics from './models/SyllabusTopics.js';
+import { seedTopics } from './seedTopics.js';
 import { parseTestSheet, buildTopicSubjectLookup } from './services/csvParserService.js';
 import { computeWeakTopics } from './services/weakTopicService.js';
 import {
@@ -669,6 +670,7 @@ app.listen(PORT, async () => {
   try {
     if (process.env.MONGODB_URI) {
       await initMongo();
+      await seedTopics(); // Seed the syllabus right after connecting!
     }
     const mongoStatus = isMongoReady();
     console.log("Mongo Ready Status:", mongoStatus);
