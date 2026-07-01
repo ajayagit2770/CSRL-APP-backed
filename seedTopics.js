@@ -25,6 +25,7 @@ export const syllabusData = [
       "Kinetic Theory",
       "SHM / Oscillations",
       "SHM",
+      "Oscillations",
       "Waves"
     ]
   },
@@ -47,12 +48,20 @@ export const syllabusData = [
     subject: "Mathematics",
     topics: [
       "Sets / Relation and function",
+      "Relation and function",
+      "Sets / Probability",
       "Complex Numbers and Quadratic Equations",
       "Sequences and Series",
       "Permutations and Combinations",
       "Binomial Theorem (including number theory/number patterns)",
+      "Binomial Theorem (often paired with number theory)",
+      "Binomial Theorem / Number patterns",
       "Straight Lines",
       "Conic Sections (Circle, Parabola, Ellipse, Hyperbola)",
+      "Conic Sections (Circle)",
+      "Conic Sections (Parabola & Circle)",
+      "Conic Sections (Ellipse)",
+      "Conic Sections (Hyperbola)",
       "Trigonometric Functions",
       "Limits and Derivatives",
       "Probability",
