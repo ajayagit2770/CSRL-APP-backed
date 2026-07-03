@@ -450,9 +450,10 @@ const upload = multer({ storage: multer.memoryStorage() });
 app.delete('/api/admin/weak-topics/clear', authenticateToken, requireAdmin, async (req, res) => {
   try {
     await initMongo();
-    await mongoose.models.TestWeakTopics.deleteMany({});
-    await mongoose.models.StudentWeakTopics.deleteMany({});
-    await mongoose.models.CenterOverallWeakTopics.deleteMany({});
+    await CenterWeakTopics.deleteMany({});
+    await StudentWeakTopics.deleteMany({});
+    await CenterOverallWeakTopics.deleteMany({});
+    await StudentOverallWeakTopics.deleteMany({});
     console.log('[WeakTopics] All weak topic data cleared.');
     return res.json({ success: true, message: 'All weak topic data has been cleared.' });
   } catch (e) {
