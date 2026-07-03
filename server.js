@@ -444,6 +444,24 @@ app.post('/api/tests/:rollKey', authenticateToken, requireAdmin, async (req, res
 const upload = multer({ storage: multer.memoryStorage() });
 
 /**
+ * DELETE /api/admin/weak-topics/clear
+ * Clear all weak topics data across all collections.
+ */
+app.delete('/api/admin/weak-topics/clear', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await initMongo();
+    await mongoose.models.TestWeakTopics.deleteMany({});
+    await mongoose.models.StudentWeakTopics.deleteMany({});
+    await mongoose.models.CenterOverallWeakTopics.deleteMany({});
+    console.log('[WeakTopics] All weak topic data cleared.');
+    return res.json({ success: true, message: 'All weak topic data has been cleared.' });
+  } catch (e) {
+    console.error('[WeakTopics] Clear error:', e);
+    return res.status(500).json({ success: false, message: e.message || 'Failed to clear weak topics data.' });
+  }
+});
+
+/**
  * POST /api/admin/weak-topics/upload-test-sheet
  * Upload a unified test sheet (CSV) containing headers, topic row, answer-key row,
  * and all student marks in a single file — no paper1/paper2 split.
