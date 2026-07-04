@@ -267,7 +267,10 @@ export function parseTestSheet(buffer) {
 
     const studentId = String(row[rollIdx]     || '').trim();
     const name      = String(row[nameIdx]     || '').trim();
-    const centerId  = String(row[locationIdx] || '').trim();
+    let centerId    = String(row[locationIdx] || '').trim();
+
+    if (centerId.toUpperCase() === 'KNP') centerId = 'GAIL';
+    if (centerId.toUpperCase() === 'JDH') centerId = 'OIL_INDIA';
 
     if (!studentId || !centerId) continue; // skip rows without both roll+center
 
