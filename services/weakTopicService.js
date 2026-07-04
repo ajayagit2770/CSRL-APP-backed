@@ -216,12 +216,14 @@ export async function computeWeakTopics(testId) {
   const allStudentIds = new Set(allStudentResults.map(r => r.studentId));
   const allCenterIds  = new Set(allStudentResults.map(r => r.centerId).filter(Boolean));
 
-  for (const studentId of allStudentIds) {
-    await computeStudentOverallWeakTopics(studentId);
+  const studentIdsArray = Array.from(allStudentIds);
+  for (let i = 0; i < studentIdsArray.length; i += 25) {
+    const chunk = studentIdsArray.slice(i, i + 25);
+    await Promise.all(chunk.map(id => computeStudentOverallWeakTopics(id)));
   }
-  for (const centerId of allCenterIds) {
-    await computeCenterOverallWeakTopics(centerId);
-  }
+
+  const centerIdsArray = Array.from(allCenterIds);
+  await Promise.all(centerIdsArray.map(id => computeCenterOverallWeakTopics(id)));
 
   return {
     studentsProcessed:  allStudentResults.length,
