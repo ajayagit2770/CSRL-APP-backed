@@ -11,6 +11,7 @@ import CenterWeakTopics from './models/CenterWeakTopics.js';
 import StudentOverallWeakTopics from './models/StudentOverallWeakTopics.js';
 import CenterOverallWeakTopics from './models/CenterOverallWeakTopics.js';
 import SyllabusTopics from './models/SyllabusTopics.js';
+import TestScore from './models/TestScore.js';
 import { seedTopics } from './seedTopics.js';
 import { parseTestSheet, buildTopicSubjectLookup } from './services/csvParserService.js';
 import { computeWeakTopics } from './services/weakTopicService.js';
@@ -22,6 +23,7 @@ import {
   loadApplicationData,
   sliceCenterFromGlobal,
   getReadCacheStatus,
+  invalidateDataCache,
 } from './services/dbService.js';
 import {
   computeOverview,
@@ -435,6 +437,42 @@ app.post('/api/tests/:rollKey', authenticateToken, requireAdmin, async (req, res
   } catch (e) {
     console.error('[CRUD] Test upsert failed:', e);
     return res.status(500).json({ message: e.message || 'Save failed' });
+  }
+});
+
+/**
+ * DELETE /api/admin/tests/:testKey
+ * Format (delete) all marks and analytics data for a specific test.
+ */
+app.delete('/api/admin/tests/:testKey', authenticateToken, requireAdmin, async (req, res) => {
+  const { testKey } = req.params;
+  try {
+    if (isDbEnabled()) {
+      await initMongo();
+      
+      const updateResult = await TestScore.updateMany(
+        {},
+        { $unset: { [`tests.${testKey}`]: "" } }
+      );
+      
+      const res1 = await StudentWeakTopics.deleteMany({ testId: testKey });
+      const res2 = await CenterWeakTopics.deleteMany({ testId: testKey });
+      const res3 = await TopicMap.deleteMany({ testId: testKey });
+      const res4 = await StudentRawMarks.deleteMany({ testId: testKey });
+      
+      invalidateDataCache();
+      console.log(`[CRUD] Formatted test data for ${testKey} | Scores updated: ${updateResult.modifiedCount} | SRM: ${res4.deletedCount}`);
+      return res.json({ success: true, message: `Successfully formatted test data for ${testKey}` });
+    } else {
+       const globalData = await loadApplicationData();
+       globalData.tests.forEach(t => {
+         if (t[testKey] !== undefined) delete t[testKey];
+       });
+       return res.json({ success: true, message: `Formatted test data (memory) for ${testKey}` });
+    }
+  } catch (e) {
+    console.error('[CRUD] Format test failed:', e);
+    return res.status(500).json({ message: e.message || 'Format failed' });
   }
 });
 
