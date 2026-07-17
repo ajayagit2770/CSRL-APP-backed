@@ -73,26 +73,44 @@ export function rankStudentsByTest(profiles, tests, testKey) {
   if (!testKey) return [];
 
   const scored = [];
+  const absent = [];
   profiles.forEach((p) => {
     const testDoc = tests.find((t) => t.ROLL_KEY === p.ROLL_KEY);
-    if (!testDoc) return;
-    const mark = numericScore(testDoc[testKey]);
-    if (mark === null) return;
-    scored.push({
-      roll:     p.ROLL_KEY,
-      name:     p["STUDENT'S NAME"] || '',
-      marks:    mark,
-      center:   p.centerCode || '',
-      category: p.CATEGORY   || '',
-      stream:   p.stream     || testDoc.stream || 'JEE',
-      photo:    p['STUDENT PHOTO URL'] || null,
-    });
+    const rawMark = testDoc ? testDoc[testKey] : null;
+    const mark = numericScore(rawMark);
+    
+    if (mark === null) {
+      absent.push({
+        roll:     p.ROLL_KEY,
+        name:     p["STUDENT'S NAME"] || '',
+        marks:    'Absent',
+        center:   p.centerCode || '',
+        category: p.CATEGORY   || '',
+        stream:   p.stream     || (testDoc ? testDoc.stream : 'JEE'),
+        photo:    p['STUDENT PHOTO URL'] || null,
+        rank:     '-'
+      });
+    } else {
+      scored.push({
+        roll:     p.ROLL_KEY,
+        name:     p["STUDENT'S NAME"] || '',
+        marks:    mark,
+        center:   p.centerCode || '',
+        category: p.CATEGORY   || '',
+        stream:   p.stream     || (testDoc ? testDoc.stream : 'JEE'),
+        photo:    p['STUDENT PHOTO URL'] || null,
+      });
+    }
   });
 
   scored.sort((a, b) =>
     b.marks !== a.marks ? b.marks - a.marks : a.roll.localeCompare(b.roll)
   );
-  return scored.map((s, i) => ({ ...s, rank: i + 1 }));
+  
+  const rankedScored = scored.map((s, i) => ({ ...s, rank: i + 1 }));
+  absent.sort((a, b) => a.roll.localeCompare(b.roll));
+
+  return [...rankedScored, ...absent];
 }
 
 /**
