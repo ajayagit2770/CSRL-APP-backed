@@ -102,10 +102,9 @@ app.post('/api/auth/login', async (req, res) => {
       return res.json({ success: true, token, role: 'admin', id: 'admin', name: 'CSRL Admin' });
     }
   } else if (role === 'centre') {
-    const cc = CENTERS_CONFIG[id];
-    if (cc && cc.password === password) {
-      const token = jwt.sign({ role: 'centre', id }, JWT_SECRET, { expiresIn: '12h' });
-      return res.json({ success: true, token, role: 'centre', id, centerCode: id, name: cc.name });
+    if (id === 'centre' && password === 'centre123') {
+      const token = jwt.sign({ role: 'centre', id: 'centre' }, JWT_SECRET, { expiresIn: '12h' });
+      return res.json({ success: true, token, role: 'centre', id: 'centre', name: 'Centre Dashboard' });
     }
   } else if (role === 'student') {
     const globalData = await loadApplicationData();
