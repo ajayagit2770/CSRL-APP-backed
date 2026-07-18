@@ -304,8 +304,8 @@ function streamCaps(stream) {
   }
   return {
     stream: 'JEE',
-    maxTotal: 360,
-    maxBySubject: { Physics: 120, Chemistry: 120, Math: 120 },
+    maxTotal: 300,
+    maxBySubject: { Physics: 100, Chemistry: 100, Math: 100 },
   };
 }
 
@@ -313,7 +313,7 @@ function maxForSubject(stream, subject) {
   const { maxBySubject } = streamCaps(stream);
   if (subject && maxBySubject[subject] != null) return maxBySubject[subject];
   const vals = Object.values(maxBySubject);
-  return vals.length ? Math.max(...vals) : 120;
+  return vals.length ? Math.max(...vals) : 100;
 }
 
 function round2(n) {
@@ -639,6 +639,6 @@ export function computeTestInsights(profiles, tests, testKey, testColumns, optio
     qualificationRateByCentre,
     studentInsight,
     note:
-      'Based on stored marks only. Score % uses stream maxima (JEE: 360 total, 120 per subject; NEET: 720 total, 180+180+360). Qualification uses default cutoffs (JEE: 40% of total, NEET: fixed 550 total, and 35% per subject). Attempt accuracy is not stored in this system.',
+      'Based on stored marks only. Score % uses stream maxima (JEE: 300 total, 100 per subject; NEET: 720 total, 180+180+360). Qualification uses default cutoffs (JEE: 40% of total, NEET: fixed 550 total, and 35% per subject). Attempt accuracy is not stored in this system.',
   };
 }
