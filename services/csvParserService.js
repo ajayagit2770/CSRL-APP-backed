@@ -257,6 +257,7 @@ export function parseTestSheet(buffer) {
 
   // ── 6. Parse student rows (starts after answer key) ──────────────────────
   const students = [];
+  const seenStudents = new Set();
   const startRowIdx = Math.max(answerKeyRowIdx + 1, topicRowIdx + 1, 3); // ensure we don't parse headers
 
   for (let rowIdx = startRowIdx; rowIdx < allRows.length; rowIdx++) {
@@ -273,6 +274,12 @@ export function parseTestSheet(buffer) {
     if (centerId.toUpperCase() === 'JDH') centerId = 'OIL_INDIA';
 
     if (!studentId || !centerId) continue; // skip rows without both roll+center
+
+    if (seenStudents.has(studentId)) {
+      console.warn(`[WeakTopics] Skipping duplicate student row for Roll No: ${studentId}`);
+      continue;
+    }
+    seenStudents.add(studentId);
 
     const marks = {};
     for (let i = 0; i < qColIndices.length; i++) {
