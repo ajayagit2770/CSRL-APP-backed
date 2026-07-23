@@ -171,7 +171,7 @@ export async function computeWeakTopics(testId) {
         if (mark > 0) {
           correct++;
           if (subj && subjectMetrics[subj]) subjectMetrics[subj].correct++;
-        } else {
+        } else if (mark < 0) {
           wrong++;
           if (subj && subjectMetrics[subj]) subjectMetrics[subj].wrong++;
         }
