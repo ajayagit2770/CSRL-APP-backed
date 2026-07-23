@@ -122,9 +122,17 @@ export async function loadApplicationData() {
   return loadGlobalDataFromDb();
 }
 
+function normalizeCenterCode(v) {
+  const code = String(v ?? '').trim().toUpperCase();
+  if (code === 'KNP' || code === 'KANPUR') return 'GAIL';
+  if (code === 'JDH' || code === 'JDP' || code === 'JODHPUR') return 'OIL_INDIA';
+  return code;
+}
+
 export function sliceCenterFromGlobal(globalData, centerCode) {
-  const profiles = globalData.profiles.filter((p) => p.centerCode === centerCode);
-  const tests = globalData.tests.filter((t) => t.centerCode === centerCode);
+  const normCenter = normalizeCenterCode(centerCode);
+  const profiles = globalData.profiles.filter((p) => normalizeCenterCode(p.centerCode) === normCenter);
+  const tests = globalData.tests.filter((t) => normalizeCenterCode(t.centerCode) === normCenter);
   const colSet = new Set();
   tests.forEach((t) => {
     Object.keys(t).forEach((k) => {
