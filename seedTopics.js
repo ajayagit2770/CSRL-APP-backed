@@ -6,85 +6,112 @@ export const syllabusData = [
   {
     subject: "Physics",
     topics: [
-      "Units & Dimensions",
+      "General Physics and Experimental skills",
       "Kinematics",
-      "Projectile Motion",
-      "Laws of Motion",
-      "Circular Motion",
-      "WPE (Work, Power, Energy) / Work-Energy Theorem",
-      "WPE", 
-      "Work-Energy Theorem",
-      "Rotational Motion / Rotational Dynamics",
-      "Rotational Motion", 
-      "Rotational Dynamics",
-      "Gravitation",
-      "Elasticity",
-      "Fluid Mechanics",
-      "Thermal Expansion",
-      "Thermodynamics",
-      "Kinetic Theory",
-      "SHM / Oscillations",
+      "Laws of Motion, Friction",
+      "Circular motion",
+      "Work, Power & Energy",
+      "Center of Mass & Collisions",
+      "Rotation",
       "SHM",
-      "Oscillations",
-      "Waves"
+      "WAVES",
+      "Electrostatics",
+      "Gravitation",
+      "Capacitors",
+      "Current Electricity",
+      "EM Waves",
+      "Wave Optics",
+      "Geometric Optics",
+      "Modern Physics",
+      "Semi Conductors",
+      "Magnetic effect of current",
+      "Magnetism",
+      "EMI",
+      "AC",
+      "Thermal Physics",
+      "Elasticity",
+      "Fluid"
     ]
   },
   {
     subject: "Chemistry",
     topics: [
+      "CLASS XIth Revision",
+      "CLASS XIIth Revision",
       "Some Basic Concepts of Chemistry",
-      "Structure of Atom",
-      "Classification of Elements & Periodicity",
+      "Redox reactions",
+      "Solutions",
+      "Atomic Structure",
+      "Classification of elements & periodicity in properties",
       "Chemical Bonding & Molecular Structure",
-      "Thermodynamics",
-      "Equilibrium",
-      "Redox Reactions",
-      "p-Block Elements (Group 13 & 14)",
-      "Organic Chemistry - Basic Principles",
-      "Hydrocarbons"
+      "Coordination Compounds",
+      "d & f Block elements",
+      "Chemical Kinetics",
+      "Purification & Characterisation of Organic Compounds",
+      "Some Basic Principles of Organic Chemistry-Nomenclature, Fundamental Concepts, Reaction Intermediates, Reaction Mechanism",
+      "Isomerism - Structural & Stereoisomerism",
+      "Hydrocarbons-Alkanes, Alkenes, Alkynes & Aromatic Hydrocarbons",
+      "Organic compounds containing Halogens-Haloalkanes & Haloarenes",
+      "Organic compounds containing oxygen-Alcohols, Phenols & Ethers, Aldehydes & Ketones, Carboxylic Acids",
+      "Organic compounds containing Nitrogen-Amines & Diazonium Salts",
+      "Biomolecules",
+      "Chemical Thermodynamics",
+      "Chemical Equilibrium",
+      "Ionic Equilibrium",
+      "Electrochemistry",
+      "p Block Elements",
+      "Principles Related to Practical Chemistry-Inorganic & Organic",
+      "States of Matter Gases & Liquids",
+      "Solid State",
+      "Hydrogen & s Block Elements",
+      "Isolation of Metals",
+      "Surface Chemistry",
+      "Polymers",
+      "Environmental Chemistry",
+      "Chemistry in everyday life"
     ]
   },
   {
     subject: "Mathematics",
     topics: [
-      "Sets / Relation and function",
-      "Relation and function",
-      "Sets / Probability",
-      "Complex Numbers and Quadratic Equations",
-      "Sequences and Series",
-      "Permutations and Combinations",
-      "Binomial Theorem (including number theory/number patterns)",
-      "Binomial Theorem (often paired with number theory)",
-      "Binomial Theorem / Number patterns",
-      "Straight Lines",
-      "Conic Sections (Circle, Parabola, Ellipse, Hyperbola)",
-      "Conic Sections (Circle)",
-      "Conic Sections (Parabola & Circle)",
-      "Conic Sections (Ellipse)",
-      "Conic Sections (Hyperbola)",
-      "Trigonometric Functions",
-      "Limits and Derivatives",
-      "Probability",
-      "Statistics"
+      "Basic Maths, Sets & Relation(Basic trigonometry, Inequalities, Modulus, Logarithm, Functions & graphs, Greatest integer Function, Surds & indices.)",
+      "Quadratic Equations",
+      "Sequence & Series",
+      "Trigonometric Identities, Equations & Inequalities: Properties & Solutions of Triangles",
+      "Binomial Theorem",
+      "Matrices & Determinants",
+      "Straight Lines and Pair of Straight Lines",
+      "Circles",
+      "Parabola",
+      "Ellipse & Hyperbola",
+      "Vectors",
+      "3-D Geometry",
+      "Statistics",
+      "Inverse trigonometric & Function",
+      "Limits, Continuity & Differentiability",
+      "MOD, Application of Derivatives",
+      "Indefinite Integration",
+      "Definite Integeration",
+      "Area",
+      "Differential Equations",
+      "Complex Numbers",
+      "P & C",
+      "Probability"
     ]
   }
 ];
 
 export async function seedTopics() {
   try {
-    console.log("Seeding SyllabusTopics...");
+    console.log("Seeding SyllabusTopics (overwriting old data)...");
+    
+    // Delete existing topics first to ensure we use the unique new list
+    await SyllabusTopics.deleteMany({});
+    console.log("Cleared existing SyllabusTopics from DB.");
+
     for (const item of syllabusData) {
-      const doc = await SyllabusTopics.findOne({ subject: item.subject });
-      if (doc) {
-        // Merge topics, ensuring uniqueness
-        const combined = new Set([...doc.topics, ...item.topics]);
-        doc.topics = Array.from(combined);
-        await doc.save();
-        console.log(`Updated subject: ${item.subject} (${doc.topics.length} topics)`);
-      } else {
-        await SyllabusTopics.create({ subject: item.subject, topics: item.topics });
-        console.log(`Created subject: ${item.subject} (${item.topics.length} topics)`);
-      }
+      await SyllabusTopics.create({ subject: item.subject, topics: item.topics });
+      console.log(`Created subject: ${item.subject} (${item.topics.length} topics)`);
     }
     console.log("Seeding complete.");
   } catch (error) {
