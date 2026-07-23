@@ -165,8 +165,9 @@ app.get('/api/data/global', authenticateToken, async (req, res) => {
 
 app.get('/api/data/center', authenticateToken, async (req, res) => {
   if (req.user.role !== 'centre') return res.status(403).json({ message: 'Forbidden' });
+  const centerCode = req.query.centerCode || req.user.id;
   const global = await loadApplicationData();
-  res.json(sliceCenterFromGlobal(global, req.user.id));
+  res.json(sliceCenterFromGlobal(global, centerCode));
 });
 
 app.get('/api/data/student', authenticateToken, async (req, res) => {
