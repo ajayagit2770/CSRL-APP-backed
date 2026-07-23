@@ -159,10 +159,13 @@ export async function computeWeakTopics(testId) {
     for (const q of allQuestionsList) {
       const mark = getMark(marks, q);
       if (mark !== null) {
-        attempted++;
         const subj = questionSubjectMap[q];
-        if (subj && subjectMetrics[subj]) {
-          subjectMetrics[subj].attempted++;
+        
+        if (mark !== 0) {
+          attempted++;
+          if (subj && subjectMetrics[subj]) {
+            subjectMetrics[subj].attempted++;
+          }
         }
 
         if (mark > 0) {
