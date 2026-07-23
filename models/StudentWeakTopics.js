@@ -6,6 +6,12 @@ const SubjectWeakSchema = new mongoose.Schema({
   mediumWeak: { type: [String], default: [] }, // "Weak Topic"    — notPositive/total >= 1/2 & < 2/3
 }, { _id: false });
 
+const SubjectMetricsSchema = new mongoose.Schema({
+  attempted: { type: Number, default: 0 },
+  correct:   { type: Number, default: 0 },
+  wrong:     { type: Number, default: 0 },
+}, { _id: false });
+
 const StudentWeakTopicsSchema = new mongoose.Schema({
   studentId:  { type: String, required: true },
   testId:     { type: String, required: true },
@@ -15,6 +21,13 @@ const StudentWeakTopicsSchema = new mongoose.Schema({
   attempted:  { type: Number, default: 0 },
   correct:    { type: Number, default: 0 },
   wrong:      { type: Number, default: 0 },
+
+  // Per-subject question performance metrics
+  subjectMetrics: {
+    Physics:     { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0 }) },
+    Chemistry:   { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0 }) },
+    Mathematics: { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0 }) },
+  },
 
   // Per-topic classification grouped by subject
   weakTopics: {

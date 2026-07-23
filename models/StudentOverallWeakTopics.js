@@ -6,6 +6,12 @@ const OverallSubjectWeakSchema = new mongoose.Schema({
   mediumWeak: { type: [String], default: [] }, // topic/subject names flagged in >= 50% of tests (either tier)
 }, { _id: false });
 
+const SubjectMetricsSchema = new mongoose.Schema({
+  attempted: { type: Number, default: 0 },
+  correct:   { type: Number, default: 0 },
+  wrong:     { type: Number, default: 0 },
+}, { _id: false });
+
 const StudentOverallWeakTopicsSchema = new mongoose.Schema({
   studentId:     { type: String, required: true },
   centerId:      { type: String, required: true },
@@ -16,6 +22,13 @@ const StudentOverallWeakTopicsSchema = new mongoose.Schema({
   totalAttempted: { type: Number, default: 0 },
   totalCorrect:   { type: Number, default: 0 },
   totalWrong:     { type: Number, default: 0 },
+
+  // Multi-test aggregate: subject-level metrics
+  overallSubjectMetrics: {
+    Physics:     { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0 }) },
+    Chemistry:   { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0 }) },
+    Mathematics: { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0 }) },
+  },
 
   // Multi-test aggregate: topic-level (existing)
   overallWeakTopics: {

@@ -62,6 +62,12 @@ export async function computeStudentOverallWeakTopics(studentId) {
   let totalCorrect = 0;
   let totalWrong = 0;
 
+  const overallSubjectMetrics = {
+    Physics:     { attempted: 0, correct: 0, wrong: 0 },
+    Chemistry:   { attempted: 0, correct: 0, wrong: 0 },
+    Mathematics: { attempted: 0, correct: 0, wrong: 0 },
+  };
+
   // 3. Loop through each test the student attempted
   for (const testResult of allTestResults) {
     const testId = testResult.testId;
@@ -71,6 +77,16 @@ export async function computeStudentOverallWeakTopics(studentId) {
     totalAttempted += (testResult.attempted || 0);
     totalCorrect += (testResult.correct || 0);
     totalWrong += (testResult.wrong || 0);
+
+    if (testResult.subjectMetrics) {
+      for (const subj of SUBJECTS) {
+        if (testResult.subjectMetrics[subj]) {
+          overallSubjectMetrics[subj].attempted += (testResult.subjectMetrics[subj].attempted || 0);
+          overallSubjectMetrics[subj].correct   += (testResult.subjectMetrics[subj].correct || 0);
+          overallSubjectMetrics[subj].wrong     += (testResult.subjectMetrics[subj].wrong || 0);
+        }
+      }
+    }
 
     // Load topic map for this test to know which topics were covered
     const topicMaps = await TopicMap.find({ testId }).lean();
@@ -177,6 +193,7 @@ export async function computeStudentOverallWeakTopics(studentId) {
         totalAttempted,
         totalCorrect,
         totalWrong,
+        overallSubjectMetrics,
         overallWeakTopics:   groupedTopics,
         overallWeakSubjects: groupedSubjects,
         computedAt:          new Date(),

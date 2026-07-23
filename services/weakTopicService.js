@@ -104,6 +104,7 @@ export async function computeWeakTopics(testId) {
   const topicSubjectMap = {};  // { "Kinematics": "Physics", … }
   const topicQuestionsMap = {}; // { "Kinematics": ["Q1","Q14"], … }
   const subjectQuestionsMap = {}; // { "Physics": ["Q1","Q2",…], … }
+  const questionSubjectMap = {}; // { "Q1": "Physics", … }
   const allTestQuestions = new Set();
   const smallQuestionTopics = [];
 
@@ -121,6 +122,7 @@ export async function computeWeakTopics(testId) {
       if (!subjectQuestionsMap[entry.subject].includes(q)) {
         subjectQuestionsMap[entry.subject].push(q);
       }
+      questionSubjectMap[q] = entry.subject;
     }
   }
 
@@ -148,12 +150,28 @@ export async function computeWeakTopics(testId) {
     let correct = 0;
     let wrong = 0;
 
+    const subjectMetrics = {
+      Physics:     { attempted: 0, correct: 0, wrong: 0 },
+      Chemistry:   { attempted: 0, correct: 0, wrong: 0 },
+      Mathematics: { attempted: 0, correct: 0, wrong: 0 },
+    };
+
     for (const q of allQuestionsList) {
       const mark = getMark(marks, q);
       if (mark !== null) {
         attempted++;
-        if (mark > 0) correct++;
-        else wrong++;
+        const subj = questionSubjectMap[q];
+        if (subj && subjectMetrics[subj]) {
+          subjectMetrics[subj].attempted++;
+        }
+
+        if (mark > 0) {
+          correct++;
+          if (subj && subjectMetrics[subj]) subjectMetrics[subj].correct++;
+        } else {
+          wrong++;
+          if (subj && subjectMetrics[subj]) subjectMetrics[subj].wrong++;
+        }
       }
     }
 
@@ -194,6 +212,7 @@ export async function computeWeakTopics(testId) {
       attempted,
       correct,
       wrong,
+      subjectMetrics,
       weakTopics,
       weakSubjects,
     };
@@ -209,6 +228,7 @@ export async function computeWeakTopics(testId) {
             attempted,
             correct,
             wrong,
+            subjectMetrics,
             weakTopics,
             weakSubjects,
             computedAt:   new Date(),
