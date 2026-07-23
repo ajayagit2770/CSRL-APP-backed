@@ -57,10 +57,20 @@ export async function computeStudentOverallWeakTopics(studentId) {
   const subjectTracker = {};
   for (const s of SUBJECTS) subjectTracker[s] = { strongWeakCount: 0, mediumWeakCount: 0, testedCount: 0 };
 
+  // Overall question metrics accumulator
+  let totalAttempted = 0;
+  let totalCorrect = 0;
+  let totalWrong = 0;
+
   // 3. Loop through each test the student attempted
   for (const testResult of allTestResults) {
     const testId = testResult.testId;
     if (!testId || testId.length <= 1 || testId === 'CAT4') continue;
+
+    // Accumulate question metrics
+    totalAttempted += (testResult.attempted || 0);
+    totalCorrect += (testResult.correct || 0);
+    totalWrong += (testResult.wrong || 0);
 
     // Load topic map for this test to know which topics were covered
     const topicMaps = await TopicMap.find({ testId }).lean();
@@ -164,6 +174,9 @@ export async function computeStudentOverallWeakTopics(studentId) {
         centerId,
         testsIncluded:       finalTestsIncluded,
         totalTests:          finalTestsIncluded.length,
+        totalAttempted,
+        totalCorrect,
+        totalWrong,
         overallWeakTopics:   groupedTopics,
         overallWeakSubjects: groupedSubjects,
         computedAt:          new Date(),

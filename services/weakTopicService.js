@@ -35,6 +35,7 @@ import {
   classifySubjectForStudent,
   isStudentAbsent,
   classifyCenterRatio,
+  getMark,
 } from '../utils/topicUtils.js';
 import {
   computeStudentOverallWeakTopics,
@@ -142,6 +143,20 @@ export async function computeWeakTopics(testId) {
       continue;
     }
 
+    // ── Overall Performance Metrics ─────────────────────────────────────────
+    let attempted = 0;
+    let correct = 0;
+    let wrong = 0;
+
+    for (const q of allQuestionsList) {
+      const mark = getMark(marks, q);
+      if (mark !== null) {
+        attempted++;
+        if (mark > 0) correct++;
+        else wrong++;
+      }
+    }
+
     // ── Topic-level classification ──────────────────────────────────────────
     const weakTopics = buildEmptyGrouped();
 
@@ -176,6 +191,9 @@ export async function computeWeakTopics(testId) {
       studentId: doc.studentId,
       testId,
       centerId:  doc.centerId,
+      attempted,
+      correct,
+      wrong,
       weakTopics,
       weakSubjects,
     };
@@ -188,6 +206,9 @@ export async function computeWeakTopics(testId) {
         update: {
           $set: {
             centerId:     doc.centerId,
+            attempted,
+            correct,
+            wrong,
             weakTopics,
             weakSubjects,
             computedAt:   new Date(),

@@ -12,6 +12,11 @@ const StudentOverallWeakTopicsSchema = new mongoose.Schema({
   testsIncluded: { type: [String], default: [] }, // only tests student actually attempted
   totalTests:    { type: Number, default: 0 },
 
+  // Overall question performance metrics aggregated across all included tests
+  totalAttempted: { type: Number, default: 0 },
+  totalCorrect:   { type: Number, default: 0 },
+  totalWrong:     { type: Number, default: 0 },
+
   // Multi-test aggregate: topic-level (existing)
   overallWeakTopics: {
     Physics:     { type: OverallSubjectWeakSchema, default: () => ({ strongWeak: [], mediumWeak: [] }) },

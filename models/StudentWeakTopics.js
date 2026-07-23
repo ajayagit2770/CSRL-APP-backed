@@ -11,6 +11,11 @@ const StudentWeakTopicsSchema = new mongoose.Schema({
   testId:     { type: String, required: true },
   centerId:   { type: String, required: true },
 
+  // Overall question performance metrics for this specific test
+  attempted:  { type: Number, default: 0 },
+  correct:    { type: Number, default: 0 },
+  wrong:      { type: Number, default: 0 },
+
   // Per-topic classification grouped by subject
   weakTopics: {
     Physics:     { type: SubjectWeakSchema, default: () => ({ strongWeak: [], mediumWeak: [] }) },

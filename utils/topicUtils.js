@@ -23,7 +23,7 @@
  * @param {string}     question  e.g. "Q7"
  * @returns {number|null}
  */
-function getMark(marks, question) {
+export function getMark(marks, question) {
   let raw;
   if (marks instanceof Map) {
     raw = marks.get(question);
