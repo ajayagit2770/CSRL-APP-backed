@@ -4,12 +4,12 @@
 export const CENTERS_CONFIG = {
   'GAIL': {
     code: 'GAIL',
-    name: 'GUS-100 KANPUR',
+    name: 'KNP',
     password: 'center123',
   },
   'OIL_INDIA': {
     code: 'OIL_INDIA',
-    name: 'OIL-INDIA JODHPUR',
+    name: 'JDH',
     password: 'center123',
   },
 };
