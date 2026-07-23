@@ -10,6 +10,7 @@ const SubjectMetricsSchema = new mongoose.Schema({
   attempted: { type: Number, default: 0 },
   correct:   { type: Number, default: 0 },
   wrong:     { type: Number, default: 0 },
+  totalQuestions: { type: Number, default: 0 },
 }, { _id: false });
 
 const StudentWeakTopicsSchema = new mongoose.Schema({
@@ -21,6 +22,7 @@ const StudentWeakTopicsSchema = new mongoose.Schema({
   attempted:  { type: Number, default: 0 },
   correct:    { type: Number, default: 0 },
   wrong:      { type: Number, default: 0 },
+  totalQuestions: { type: Number, default: 0 },
 
   // Per-subject question performance metrics
   subjectMetrics: {

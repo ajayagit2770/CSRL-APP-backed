@@ -10,6 +10,7 @@ const SubjectMetricsSchema = new mongoose.Schema({
   attempted: { type: Number, default: 0 },
   correct:   { type: Number, default: 0 },
   wrong:     { type: Number, default: 0 },
+  totalQuestions: { type: Number, default: 0 },
 }, { _id: false });
 
 const StudentOverallWeakTopicsSchema = new mongoose.Schema({
@@ -22,12 +23,13 @@ const StudentOverallWeakTopicsSchema = new mongoose.Schema({
   totalAttempted: { type: Number, default: 0 },
   totalCorrect:   { type: Number, default: 0 },
   totalWrong:     { type: Number, default: 0 },
+  totalQuestions: { type: Number, default: 0 },
 
   // Multi-test aggregate: subject-level metrics
   overallSubjectMetrics: {
-    Physics:     { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0 }) },
-    Chemistry:   { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0 }) },
-    Mathematics: { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0 }) },
+    Physics:     { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0, totalQuestions: 0 }) },
+    Chemistry:   { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0, totalQuestions: 0 }) },
+    Mathematics: { type: SubjectMetricsSchema, default: () => ({ attempted: 0, correct: 0, wrong: 0, totalQuestions: 0 }) },
   },
 
   // Multi-test aggregate: topic-level (existing)

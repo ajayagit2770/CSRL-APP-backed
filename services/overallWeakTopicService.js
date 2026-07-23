@@ -61,11 +61,12 @@ export async function computeStudentOverallWeakTopics(studentId) {
   let totalAttempted = 0;
   let totalCorrect = 0;
   let totalWrong = 0;
+  let totalQuestions = 0;
 
   const overallSubjectMetrics = {
-    Physics:     { attempted: 0, correct: 0, wrong: 0 },
-    Chemistry:   { attempted: 0, correct: 0, wrong: 0 },
-    Mathematics: { attempted: 0, correct: 0, wrong: 0 },
+    Physics:     { attempted: 0, correct: 0, wrong: 0, totalQuestions: 0 },
+    Chemistry:   { attempted: 0, correct: 0, wrong: 0, totalQuestions: 0 },
+    Mathematics: { attempted: 0, correct: 0, wrong: 0, totalQuestions: 0 },
   };
 
   // 3. Loop through each test the student attempted
@@ -77,6 +78,7 @@ export async function computeStudentOverallWeakTopics(studentId) {
     totalAttempted += (testResult.attempted || 0);
     totalCorrect += (testResult.correct || 0);
     totalWrong += (testResult.wrong || 0);
+    totalQuestions += (testResult.totalQuestions || 0);
 
     if (testResult.subjectMetrics) {
       for (const subj of SUBJECTS) {
@@ -84,6 +86,7 @@ export async function computeStudentOverallWeakTopics(studentId) {
           overallSubjectMetrics[subj].attempted += (testResult.subjectMetrics[subj].attempted || 0);
           overallSubjectMetrics[subj].correct   += (testResult.subjectMetrics[subj].correct || 0);
           overallSubjectMetrics[subj].wrong     += (testResult.subjectMetrics[subj].wrong || 0);
+          overallSubjectMetrics[subj].totalQuestions += (testResult.subjectMetrics[subj].totalQuestions || 0);
         }
       }
     }
@@ -193,6 +196,7 @@ export async function computeStudentOverallWeakTopics(studentId) {
         totalAttempted,
         totalCorrect,
         totalWrong,
+        totalQuestions,
         overallSubjectMetrics,
         overallWeakTopics:   groupedTopics,
         overallWeakSubjects: groupedSubjects,

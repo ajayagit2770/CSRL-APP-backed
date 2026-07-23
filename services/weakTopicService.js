@@ -149,17 +149,22 @@ export async function computeWeakTopics(testId) {
     let attempted = 0;
     let correct = 0;
     let wrong = 0;
+    let totalQuestions = 0;
 
     const subjectMetrics = {
-      Physics:     { attempted: 0, correct: 0, wrong: 0 },
-      Chemistry:   { attempted: 0, correct: 0, wrong: 0 },
-      Mathematics: { attempted: 0, correct: 0, wrong: 0 },
+      Physics:     { attempted: 0, correct: 0, wrong: 0, totalQuestions: 0 },
+      Chemistry:   { attempted: 0, correct: 0, wrong: 0, totalQuestions: 0 },
+      Mathematics: { attempted: 0, correct: 0, wrong: 0, totalQuestions: 0 },
     };
 
     for (const q of allQuestionsList) {
       const mark = getMark(marks, q);
       if (mark !== null) {
+        totalQuestions++;
         const subj = questionSubjectMap[q];
+        if (subj && subjectMetrics[subj]) {
+          subjectMetrics[subj].totalQuestions++;
+        }
         
         if (mark !== 0) {
           attempted++;
@@ -231,6 +236,7 @@ export async function computeWeakTopics(testId) {
             attempted,
             correct,
             wrong,
+            totalQuestions,
             subjectMetrics,
             weakTopics,
             weakSubjects,
